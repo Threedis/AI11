@@ -546,7 +546,7 @@
                     row.sno,
                     '"' + row.date.replace(/"/g, '""') + '"',
                     '"' + row.vendorName.replace(/"/g, '""') + '"',
-                    row.amount,
+                    '"' + row.amount.replace(/"/g, '""') + '"',
                     '"' + row.project.replace(/"/g, '""') + '"',
                     row.pbb,
                     '"' + row.productDescription.replace(/"/g, '""') + '"',
@@ -576,22 +576,94 @@
             showStatus(`✓ CSV downloaded: ${extractedData.length} records`, 'success');
         }
 
+        function xmlEscape(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&apos;');
+        }
+
+        function cellXML(value, forceText) {
+            const str = (value === null || value === undefined) ? '' : String(value);
+            // Treat SNo and PBB as numbers when purely numeric; everything else
+            // (including Amount, which has commas) stays text so Excel doesn't
+            // try to re-parse/mangle it.
+            const isNumeric = !forceText && /^-?\d+(\.\d+)?$/.test(str.trim());
+            const type = isNumeric ? 'Number' : 'String';
+            return `<Cell><Data ss:Type="${type}">${xmlEscape(str)}</Data></Cell>`;
+        }
+
+        function generateExcelXML() {
+            const headers = ['SNo', 'Date', 'Vendor Name', 'Amount', 'Project', 'PBB', 'Product description', 'Po Date', 'PO'];
+
+            let rowsXML = '';
+            rowsXML += '<Row ss:StyleID="Header">' + headers.map(h => cellXML(h, true)).join('') + '</Row>\n';
+
+            extractedData.forEach(row => {
+                rowsXML += '<Row>' +
+                    cellXML(row.sno) +
+                    cellXML(row.date, true) +
+                    cellXML(row.vendorName, true) +
+                    cellXML(row.amount, true) +
+                    cellXML(row.project, true) +
+                    cellXML(row.pbb) +
+                    cellXML(row.productDescription, true) +
+                    cellXML(row.poDate, true) +
+                    cellXML(row.po, true) +
+                    '</Row>\n';
+            });
+
+            return `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+ <Styles>
+  <Style ss:ID="Header">
+   <Font ss:Bold="1" ss:Color="#FFFFFF"/>
+   <Interior ss:Color="#667EEA" ss:Pattern="Solid"/>
+  </Style>
+ </Styles>
+ <Worksheet ss:Name="Payment Advice">
+  <Table>
+   <Column ss:Width="40"/>
+   <Column ss:Width="140"/>
+   <Column ss:Width="180"/>
+   <Column ss:Width="90"/>
+   <Column ss:Width="110"/>
+   <Column ss:Width="50"/>
+   <Column ss:Width="170"/>
+   <Column ss:Width="80"/>
+   <Column ss:Width="230"/>
+${rowsXML}  </Table>
+ </Worksheet>
+</Workbook>`;
+        }
+
         function downloadExcel() {
-            // Create a simple CSV and open it - user can save as .xlsx
-            const csv = generateCSV();
-            const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+            if (extractedData.length === 0) {
+                showStatus('❌ No data to export yet', 'error');
+                return;
+            }
+
+            const xml = generateExcelXML();
+            const blob = new Blob([xml], { type: 'application/vnd.ms-excel' });
             const link = document.createElement('a');
             const url = URL.createObjectURL(blob);
-            
+
             link.setAttribute('href', url);
-            link.setAttribute('download', 'Payment_Advice_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+            link.setAttribute('download', 'Payment_Advice_' + new Date().toISOString().slice(0, 10) + '.xls');
             link.style.visibility = 'hidden';
-            
+
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            
-            showStatus(`✓ Excel file downloaded: ${extractedData.length} records (CSV format - open with Excel)`, 'success');
+            URL.revokeObjectURL(url);
+
+            showStatus(`✓ Excel file downloaded: ${extractedData.length} records`, 'success');
         }
 
         function showStatus(msg, type) {
