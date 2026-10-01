@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Advice Text Extractor to Excel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #1565c0;
+        }
+
+        .upload-section {
+            background: #f8f9fa;
+            border: 3px dashed #667eea;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 25px;
+        }
+
+        .upload-section.drag-over {
+            background: #e8f0ff;
+            border-color: #764ba2;
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.2);
+        }
+
+        .upload-section input {
+            display: none;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .upload-text {
+            color: #333;
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+
+        .upload-hint {
+            color: #999;
+            font-size: 12px;
+        }
+
+        .file-name {
+            color: #667eea;
+            font-weight: 500;
+            margin-top: 10px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #764ba2;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #e0e0e0;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .status.show {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .preview-section {
+            display: none;
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 1px solid #eee;
+        }
+
+        .preview-section.show {
+            display: block;
+        }
+
+        .preview-title {
+            color: #333;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .stat-box {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+            border-left: 4px solid #667eea;
+        }
+
+        .stat-number {
+            font-size: 28px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            max-height: 600px;
+            overflow-y: auto;
+            margin: 20px 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+
+        thead {
+            background: #667eea;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        th {
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: white;
+            border-bottom: 2px solid #667eea;
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #eee;
+            color: #555;
+            max-width: 200px;
+            word-break: break-word;
+        }
+
+        tr:hover {
+            background: #f9f9f9;
+        }
+
+        .row-number {
+            background: #f8f9fa;
+            font-weight: 500;
+            color: #999;
+            width: 40px;
+            text-align: center;
+        }
+
+        .empty-message {
+            padding: 40px;
+            text-align: center;
+            color: #999;
+        }
+
+        .csv-output {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+            font-family: monospace;
+            font-size: 11px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 22px;
+            }
+
+            .stats {
+                grid-template-columns: 1fr;
+            }
+
+            .table-wrapper {
+                font-size: 10px;
+            }
+
+            td, th {
+                padding: 6px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>💳 Payment Advice Extractor</h1>
+        <p class="subtitle">Extract payment advices and convert to CSV/Excel format</p>
+
+        <div class="info-box">
+            ℹ️ <strong>Method:</strong> Copy-paste the PDF text content below, or paste extracted text directly. The tool will parse and extract structured data.
+        </div>
+
+        <div style="margin-bottom: 25px;">
+            <label style="display: block; margin-bottom: 10px; color: #333; font-weight: 600;">📋 Paste PDF Text Content Here:</label>
+            <textarea id="textInput" style="width: 100%; height: 200px; padding: 12px; border: 2px solid #ddd; border-radius: 6px; font-family: monospace; font-size: 12px; resize: vertical;" placeholder="Paste the text extracted from your PDF Payment Advice here..."></textarea>
+        </div>
+
+        <div class="status" id="status"></div>
+
+        <div class="controls">
+            <button class="btn btn-primary" id="processBtn">⚙️ Extract & Parse</button>
+            <button class="btn btn-primary" id="downloadCSVBtn" disabled>📥 Download as CSV</button>
+            <button class="btn btn-primary" id="downloadExcelBtn" disabled>📥 Download as Excel</button>
+            <button class="btn btn-secondary" id="resetBtn">🔄 Reset</button>
+        </div>
+
+        <div class="preview-section" id="previewSection">
+            <div class="preview-title">📊 Extracted Payment Advice Records</div>
+            
+            <div class="stats">
+                <div class="stat-box">
+                    <div class="stat-number" id="recordCount">0</div>
+                    <div class="stat-label">Records Extracted</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number" id="totalAmount">₹0</div>
+                    <div class="stat-label">Total Amount</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number" id="uniqueVendors">0</div>
+                    <div class="stat-label">Unique Vendors</div>
+                </div>
+            </div>
+
+            <div class="table-wrapper">
+                <table id="previewTable">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>SNo</th>
+                            <th>Date</th>
+                            <th>Vendor Name</th>
+                            <th>Amount</th>
+                            <th>Project</th>
+                            <th>PBB</th>
+                            <th>Product Description</th>
+                            <th>Po Date</th>
+                            <th>PO</th>
+                        </tr>
+                    </thead>
+                    <tbody id="previewBody">
+                        <tr><td colspan="10" class="empty-message">No data extracted yet</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <h3 style="color: #333; margin-bottom: 10px;">CSV Output:</h3>
+                <div class="csv-output" id="csvOutput"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let extractedData = [];
+
+        const textInput = document.getElementById('textInput');
+        const processBtn = document.getElementById('processBtn');
+        const downloadCSVBtn = document.getElementById('downloadCSVBtn');
+        const downloadExcelBtn = document.getElementById('downloadExcelBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const status = document.getElementById('status');
+        const previewSection = document.getElementById('previewSection');
+
+        processBtn.addEventListener('click', processText);
+        downloadCSVBtn.addEventListener('click', downloadCSV);
+        downloadExcelBtn.addEventListener('click', downloadExcel);
+        resetBtn.addEventListener('click', resetForm);
+
+        function processText() {
+            const text = textInput.value.trim();
+            
+            if (!text) {
+                showStatus('❌ Please paste PDF text content first', 'error');
+                return;
+            }
+
+            extractedData = [];
+            extractPaymentAdvices(text);
+
+            if (extractedData.length > 0) {
+                showStatus(`✓ Successfully extracted ${extractedData.length} payment advice record(s)`, 'success');
+                downloadCSVBtn.disabled = false;
+                downloadExcelBtn.disabled = false;
+                displayPreview();
+            } else {
+                showStatus('⚠️ No payment advice records found. Check the text format.', 'info');
+            }
+        }
+
+        function extractPaymentAdvices(fullText) {
+            // Normalize: collapse runs of spaces (PDF copy-paste often has huge gaps
+            // from table columns) but keep newlines intact
+            const normalized = fullText.replace(/[ \t]+/g, ' ');
+
+            // Each invoice's fields (PO DATE, calc table, Name of Work, Name of
+            // Agency, Date of Submission, PAYMENT ADVICE, PROJECT, PO ref) all sit
+            // together between one "PO DATE" marker and the next one. That is the
+            // only field guaranteed to start every record, so split on it.
+            const records = normalized.split(/(?=PO DATE)/i).filter(r => r.trim().length > 0);
+
+            console.log(`Found ${records.length} potential record block(s)`);
+
+            records.forEach((block, i) => {
+                try {
+                    const vendorName = extractValue(block, /Name of Agency\s*:\s*([^\n]+)/i);
+                    const date = extractValue(block, /Date of Submission[^\n]*?:\s*([^\n]+)/i);
+                    // "Net Payable Amount ………… L+M=N  297,898  297,898" -- no colon,
+                    // just dots/spaces before L+M=N, then the first amount number.
+                    const amount = extractValue(block, /Net Payable Amount[\s\S]*?L\+M=N\s+([\d,]+)/i);
+                    const project = extractValue(block, /PROJECT\s*:\s*([^\n]+)/i);
+                    const poRef = extractValue(block, /P\.?\s*O[^\n]*?ref no[.:]*\s*([^\n]*)/i);
+                    const productDesc = extractValue(block, /Name of Wor[kK]\s*:?\s*([^\n]+)/i);
+                    const poDate = extractValue(block, /PO DATE\s*([0-9]{1,2}-[A-Za-z]{3}-[0-9]{2,4})?/i);
+
+                    let pbb = '';
+                    const pbbMatch = project.match(/(\d+)\s*PBB/i);
+                    if (pbbMatch) {
+                        pbb = pbbMatch[1];
+                    }
+
+                    // A valid invoice record needs at least a vendor name and an amount
+                    if (vendorName.trim() && amount.trim()) {
+                        const data = {
+                            sno: extractedData.length + 1,
+                            date: date.trim(),
+                            vendorName: vendorName.trim(),
+                            amount: amount.trim(),
+                            project: project.trim(),
+                            pbb: pbb.trim(),
+                            productDescription: productDesc.trim(),
+                            poDate: (poDate || '').trim(),
+                            po: poRef.trim()
+                        };
+
+                        extractedData.push(data);
+                        console.log(`Record ${data.sno} extracted:`, data);
+                    } else {
+                        console.log(`Block ${i} skipped (missing vendor name or amount)`, { vendorName, amount });
+                    }
+                } catch (e) {
+                    console.error(`Error extracting block ${i}:`, e);
+                }
+            });
+
+            console.log(`Total records successfully extracted: ${extractedData.length}`);
+        }
+
+        function extractValue(text, pattern) {
+            try {
+                const match = text.match(pattern);
+                return match ? match[1] : '';
+            } catch (e) {
+                return '';
+            }
+        }
+
+        function displayPreview() {
+            const tbody = document.getElementById('previewBody');
+            tbody.innerHTML = '';
+
+            if (extractedData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" class="empty-message">No data to display</td></tr>';
+                return;
+            }
+
+            extractedData.forEach((row, idx) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="row-number">${idx + 1}</td>
+                    <td>${row.sno}</td>
+                    <td>${row.date}</td>
+                    <td>${row.vendorName}</td>
+                    <td>${row.amount}</td>
+                    <td>${row.project}</td>
+                    <td>${row.pbb}</td>
+                    <td>${row.productDescription}</td>
+                    <td>${row.poDate}</td>
+                    <td>${row.po}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('recordCount').textContent = extractedData.length;
+            
+            const total = extractedData.reduce((sum, r) => {
+                const num = parseInt(r.amount.replace(/\D/g, '')) || 0;
+                return sum + num;
+            }, 0);
+            document.getElementById('totalAmount').textContent = '₹' + total.toLocaleString('en-IN');
+            
+            const uniqueVendors = new Set(extractedData.map(r => r.vendorName)).size;
+            document.getElementById('uniqueVendors').textContent = uniqueVendors;
+
+            // Display CSV
+            const csv = generateCSV();
+            document.getElementById('csvOutput').textContent = csv;
+
+            previewSection.classList.add('show');
+        }
+
+        function generateCSV() {
+            let csv = 'SNo,Date,Vendor Name,Amount,Project,PBB,Product description,Po Date,PO\n';
+            
+            extractedData.forEach(row => {
+                const fields = [
+                    row.sno,
+                    '"' + row.date.replace(/"/g, '""') + '"',
+                    '"' + row.vendorName.replace(/"/g, '""') + '"',
+                    row.amount,
+                    '"' + row.project.replace(/"/g, '""') + '"',
+                    row.pbb,
+                    '"' + row.productDescription.replace(/"/g, '""') + '"',
+                    row.poDate,
+                    '"' + row.po.replace(/"/g, '""') + '"'
+                ];
+                csv += fields.join(',') + '\n';
+            });
+            
+            return csv;
+        }
+
+        function downloadCSV() {
+            const csv = generateCSV();
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'Payment_Advice_' + new Date().toISOString().slice(0, 10) + '.csv');
+            link.style.visibility = 'hidden';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showStatus(`✓ CSV downloaded: ${extractedData.length} records`, 'success');
+        }
+
+        function downloadExcel() {
+            // Create a simple CSV and open it - user can save as .xlsx
+            const csv = generateCSV();
+            const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'Payment_Advice_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+            link.style.visibility = 'hidden';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showStatus(`✓ Excel file downloaded: ${extractedData.length} records (CSV format - open with Excel)`, 'success');
+        }
+
+        function showStatus(msg, type) {
+            status.textContent = msg;
+            status.className = `status show ${type}`;
+        }
+
+        function resetForm() {
+            textInput.value = '';
+            extractedData = [];
+            downloadCSVBtn.disabled = true;
+            downloadExcelBtn.disabled = true;
+            status.classList.remove('show');
+            previewSection.classList.remove('show');
+            document.getElementById('previewBody').innerHTML = '<tr><td colspan="10" class="empty-message">No data extracted yet</td></tr>';
+        }
+    </script>
+</body>
+</html>
