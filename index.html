@@ -1,685 +1,619 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Payment Advice Text Extractor to Excel</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Payment Advice Extractor</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<style>
+  :root {
+    --bg: #f4f5f8; --card: #ffffff; --ink: #1d2433; --muted: #667085; --line: #e3e6ec;
+    --accent: #4f46e5; --accent-ink: #ffffff; --accent-soft: #eef0ff;
+    --ok: #127a46; --ok-soft: #e7f6ee; --warn: #9a5b00; --warn-soft: #fff4e0; --bad: #b42318; --bad-soft: #fdecea;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif; background: var(--bg); color: var(--ink); font-size: 14px; line-height: 1.45; }
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 28px 16px 60px; }
+  header h1 { font-size: 22px; font-weight: 650; letter-spacing: -0.01em; }
+  header p { color: var(--muted); margin-top: 4px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 20px; margin-top: 18px; }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
+  .drop { display: block; border: 2px dashed #b9bff5; border-radius: 10px; padding: 34px 16px; text-align: center; cursor: pointer; background: #fafbff; transition: background .15s, border-color .15s; }
+  .drop:hover, .drop.over { background: var(--accent-soft); border-color: var(--accent); }
+  .drop strong { display: block; font-size: 16px; margin-bottom: 4px; }
+  .drop span { color: var(--muted); font-size: 13px; }
+  .drop input { display: none; }
 
-        .container {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            padding: 40px;
-            max-width: 1200px;
-            width: 100%;
-        }
+  .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 16px; }
+  .btn { border: 1px solid var(--line); background: #fff; color: var(--ink); padding: 9px 16px; border-radius: 8px; font: inherit; font-weight: 600; cursor: pointer; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn:not(:disabled):hover { filter: brightness(0.96); }
+  .status { flex: 1 1 260px; color: var(--muted); font-size: 13px; }
+  .status.err { color: var(--bad); }
 
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 28px;
-        }
+  .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  .stat { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+  .stat b { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+  .stat small { color: var(--muted); }
+  @media (max-width: 720px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
-        .subtitle {
-            color: #666;
-            margin-bottom: 30px;
-            font-size: 14px;
-        }
+  .tablewrap { overflow: auto; max-height: 62vh; border: 1px solid var(--line); border-radius: 8px; margin-top: 14px; }
+  table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+  th { position: sticky; top: 0; background: #f0f2f6; text-align: left; font-weight: 600; padding: 9px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; z-index: 1; }
+  td { padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  td[contenteditable="true"] { outline: none; min-width: 60px; }
+  td[contenteditable="true"]:focus { background: #fffbe6; box-shadow: inset 0 0 0 2px #f5c542; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.missing { background: var(--bad-soft); }
+  td.src { color: var(--muted); white-space: nowrap; font-size: 11.5px; }
+  .tag { display: inline-block; padding: 1px 7px; border-radius: 8px; font-size: 11px; font-weight: 600; margin: 1px 2px 1px 0; }
+  .tag.ok { background: var(--ok-soft); color: var(--ok); }
+  .tag.warn { background: var(--warn-soft); color: var(--warn); }
+  .tag.bad { background: var(--bad-soft); color: var(--bad); }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
 
-        .info-box {
-            background: #e3f2fd;
-            border-left: 4px solid #2196f3;
-            padding: 15px;
-            border-radius: 4px;
-            margin-bottom: 20px;
-            font-size: 13px;
-            color: #1565c0;
-        }
-
-        .upload-section {
-            background: #f8f9fa;
-            border: 3px dashed #667eea;
-            border-radius: 8px;
-            padding: 40px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            margin-bottom: 25px;
-        }
-
-        .upload-section.drag-over {
-            background: #e8f0ff;
-            border-color: #764ba2;
-            box-shadow: 0 0 20px rgba(102, 126, 234, 0.2);
-        }
-
-        .upload-section input {
-            display: none;
-        }
-
-        .upload-icon {
-            font-size: 48px;
-            margin-bottom: 15px;
-        }
-
-        .upload-text {
-            color: #333;
-            font-size: 16px;
-            font-weight: 500;
-            margin-bottom: 5px;
-        }
-
-        .upload-hint {
-            color: #999;
-            font-size: 12px;
-        }
-
-        .file-name {
-            color: #667eea;
-            font-weight: 500;
-            margin-top: 10px;
-        }
-
-        .controls {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 25px;
-            flex-wrap: wrap;
-        }
-
-        .btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .btn-primary {
-            background: #667eea;
-            color: white;
-        }
-
-        .btn-primary:hover:not(:disabled) {
-            background: #764ba2;
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
-        }
-
-        .btn-primary:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-        }
-
-        .btn-secondary {
-            background: #f0f0f0;
-            color: #333;
-        }
-
-        .btn-secondary:hover:not(:disabled) {
-            background: #e0e0e0;
-        }
-
-        .status {
-            padding: 15px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-            display: none;
-        }
-
-        .status.show {
-            display: block;
-            animation: slideIn 0.3s ease;
-        }
-
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .status.success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-
-        .status.error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-
-        .status.info {
-            background: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-        }
-
-        .preview-section {
-            display: none;
-            margin-top: 30px;
-            padding-top: 30px;
-            border-top: 1px solid #eee;
-        }
-
-        .preview-section.show {
-            display: block;
-        }
-
-        .preview-title {
-            color: #333;
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 15px;
-        }
-
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 15px;
-            margin: 20px 0;
-        }
-
-        .stat-box {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 6px;
-            text-align: center;
-            border-left: 4px solid #667eea;
-        }
-
-        .stat-number {
-            font-size: 28px;
-            font-weight: bold;
-            color: #667eea;
-        }
-
-        .stat-label {
-            font-size: 12px;
-            color: #999;
-            margin-top: 5px;
-        }
-
-        .table-wrapper {
-            overflow-x: auto;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            max-height: 600px;
-            overflow-y: auto;
-            margin: 20px 0;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 11px;
-        }
-
-        thead {
-            background: #667eea;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
-
-        th {
-            padding: 12px;
-            text-align: left;
-            font-weight: 600;
-            color: white;
-            border-bottom: 2px solid #667eea;
-            white-space: nowrap;
-        }
-
-        td {
-            padding: 10px 12px;
-            border-bottom: 1px solid #eee;
-            color: #555;
-            max-width: 200px;
-            word-break: break-word;
-        }
-
-        tr:hover {
-            background: #f9f9f9;
-        }
-
-        .row-number {
-            background: #f8f9fa;
-            font-weight: 500;
-            color: #999;
-            width: 40px;
-            text-align: center;
-        }
-
-        .empty-message {
-            padding: 40px;
-            text-align: center;
-            color: #999;
-        }
-
-        .csv-output {
-            background: #f5f5f5;
-            padding: 15px;
-            border-radius: 6px;
-            margin: 20px 0;
-            font-family: monospace;
-            font-size: 11px;
-            max-height: 300px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            word-break: break-all;
-        }
-
-        @media (max-width: 768px) {
-            .container {
-                padding: 20px;
-            }
-
-            h1 {
-                font-size: 22px;
-            }
-
-            .stats {
-                grid-template-columns: 1fr;
-            }
-
-            .table-wrapper {
-                font-size: 10px;
-            }
-
-            td, th {
-                padding: 6px;
-            }
-        }
-    </style>
+  details { margin-top: 14px; }
+  summary { cursor: pointer; font-weight: 600; }
+  .rules { margin-top: 10px; font-size: 13px; }
+  .rules table td, .rules table th { position: static; font-size: 12.5px; }
+  pre.log { background: #0f1420; color: #d6dbe6; padding: 12px; border-radius: 8px; font-size: 11.5px; max-height: 380px; overflow: auto; white-space: pre-wrap; margin-top: 10px; }
+  .empty { padding: 30px; text-align: center; color: var(--muted); }
+</style>
 </head>
 <body>
-    <div class="container">
-        <h1>💳 Payment Advice Extractor</h1>
-        <p class="subtitle">Extract payment advices and convert to CSV/Excel format</p>
+<div class="wrap">
+  <header>
+    <h1>Payment Advice Extractor</h1>
+    <p>Drop payment advice PDFs. Each page is read as one advice and exported in the Invoice Tracker template.</p>
+  </header>
 
-        <div class="info-box">
-            ℹ️ <strong>Method:</strong> Copy-paste the PDF text content below, or paste extracted text directly. The tool will parse and extract structured data.
-        </div>
-
-        <div style="margin-bottom: 25px;">
-            <label style="display: block; margin-bottom: 10px; color: #333; font-weight: 600;">📋 Paste PDF Text Content Here:</label>
-            <textarea id="textInput" style="width: 100%; height: 200px; padding: 12px; border: 2px solid #ddd; border-radius: 6px; font-family: monospace; font-size: 12px; resize: vertical;" placeholder="Paste the text extracted from your PDF Payment Advice here..."></textarea>
-        </div>
-
-        <div class="status" id="status"></div>
-
-        <div class="controls">
-            <button class="btn btn-primary" id="processBtn">⚙️ Extract & Parse</button>
-            <button class="btn btn-primary" id="downloadCSVBtn" disabled>📥 Download as CSV</button>
-            <button class="btn btn-primary" id="downloadExcelBtn" disabled>📥 Download as Excel</button>
-            <button class="btn btn-secondary" id="resetBtn">🔄 Reset</button>
-        </div>
-
-        <div class="preview-section" id="previewSection">
-            <div class="preview-title">📊 Extracted Payment Advice Records</div>
-            
-            <div class="stats">
-                <div class="stat-box">
-                    <div class="stat-number" id="recordCount">0</div>
-                    <div class="stat-label">Records Extracted</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-number" id="totalAmount">₹0</div>
-                    <div class="stat-label">Total Amount</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-number" id="uniqueVendors">0</div>
-                    <div class="stat-label">Unique Vendors</div>
-                </div>
-            </div>
-
-            <div class="table-wrapper">
-                <table id="previewTable">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>SNo</th>
-                            <th>Date</th>
-                            <th>Vendor Name</th>
-                            <th>Amount</th>
-                            <th>Project</th>
-                            <th>PBB</th>
-                            <th>Product Description</th>
-                            <th>Po Date</th>
-                            <th>PO</th>
-                        </tr>
-                    </thead>
-                    <tbody id="previewBody">
-                        <tr><td colspan="10" class="empty-message">No data extracted yet</td></tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <div style="margin-top: 20px;">
-                <h3 style="color: #333; margin-bottom: 10px;">CSV Output:</h3>
-                <div class="csv-output" id="csvOutput"></div>
-            </div>
-        </div>
+  <div class="card">
+    <label class="drop" id="drop">
+      <input type="file" id="fileInput" accept="application/pdf,.pdf" multiple>
+      <strong>Drop PDF files here or click to choose</strong>
+      <span>Several files at once are fine. Everything runs in your browser; nothing is uploaded.</span>
+    </label>
+    <div class="bar">
+      <button class="btn primary" id="xlsxBtn" disabled>Download Excel (template)</button>
+      <button class="btn" id="csvBtn" disabled>Download CSV</button>
+      <button class="btn" id="clearBtn">Clear</button>
+      <div class="status" id="status">No files loaded.</div>
     </div>
+  </div>
 
-    <script>
-        let extractedData = [];
+  <div class="card" id="results" hidden>
+    <div class="stats">
+      <div class="stat"><b id="stCount">0</b><small>Advices extracted</small></div>
+      <div class="stat"><b id="stTotal">₹0</b><small>Total net payable</small></div>
+      <div class="stat"><b id="stVendors">0</b><small>Unique vendors</small></div>
+      <div class="stat"><b id="stFlags">0</b><small>Rows needing a check</small></div>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th>SNo</th><th>Date</th><th>Vendor Name</th><th>Amount</th><th>Project</th><th>PBB</th>
+            <th>Product description</th><th>Po Date</th><th>PO</th><th>Source</th><th>Check</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"><tr><td colspan="11" class="empty">No data yet</td></tr></tbody>
+      </table>
+    </div>
+    <p class="hint">Cells are editable: click to correct a value before downloading. Red cells are fields the rules could not find. Source and Check are for review only and are not exported.</p>
 
-        const textInput = document.getElementById('textInput');
-        const processBtn = document.getElementById('processBtn');
-        const downloadCSVBtn = document.getElementById('downloadCSVBtn');
-        const downloadExcelBtn = document.getElementById('downloadExcelBtn');
-        const resetBtn = document.getElementById('resetBtn');
-        const status = document.getElementById('status');
-        const previewSection = document.getElementById('previewSection');
+    <details>
+      <summary>Extraction rules</summary>
+      <div class="rules">
+        <table>
+          <thead><tr><th>Template column</th><th>Taken from the advice</th><th>Written as</th></tr></thead>
+          <tbody>
+            <tr><td>SNo</td><td>Running number</td><td>Number</td></tr>
+            <tr><td>Date</td><td>Date of Submission of Complete and Corrected Bill</td><td>Text, e.g. Tuesday, September 15, 2026</td></tr>
+            <tr><td>Vendor Name</td><td>Name of Agency</td><td>Text</td></tr>
+            <tr><td>Amount</td><td>Net Payable Amount row, value in the <b>Gross Value</b> column</td><td>Number, format #,##0</td></tr>
+            <tr><td>Project</td><td>PROJECT</td><td>Text, e.g. 38 PBB</td></tr>
+            <tr><td>PBB</td><td>Not extracted (blank, as in the template)</td><td>Blank</td></tr>
+            <tr><td>Product description</td><td>Name of Work</td><td>Text</td></tr>
+            <tr><td>Po Date</td><td>PO DATE</td><td>Excel date, format d-mmm-yy</td></tr>
+            <tr><td>PO</td><td>P.O/LOI ref no.</td><td>Text</td></tr>
+          </tbody>
+        </table>
+        <p class="hint">A value is the text after the label (colon optional), up to the next label or a wide column gap. If nothing follows the label on its line, the value is read from the line below. Name of Work and Name of Agency also pick up a wrapped second line that starts at the same position. Dates are read as day-month-year (15-Sep-26, 15/09/2026, 15.09.2026, 15 September 2026, September 15, 2026). For Amount, the tool finds the Gross Value column heading and takes the number on the Net Payable Amount row under it. If there is no Gross Value heading, it uses the largest number on that row (Gross = Basic + Tax) and flags the row for a check. A page with none of PROJECT, PO ref or Name of Agency is treated as a continuation of the previous page.</p>
+      </div>
+    </details>
 
-        processBtn.addEventListener('click', processText);
-        downloadCSVBtn.addEventListener('click', downloadCSV);
-        downloadExcelBtn.addEventListener('click', downloadExcel);
-        resetBtn.addEventListener('click', resetForm);
+    <details>
+      <summary>Page text log (for testing the rules)</summary>
+      <pre class="log" id="log"></pre>
+    </details>
+  </div>
+</div>
 
-        function processText() {
-            const text = textInput.value.trim();
-            
-            if (!text) {
-                showStatus('❌ Please paste PDF text content first', 'error');
-                return;
-            }
+<script>
+/* ===================== Configuration ===================== */
+const TEMPLATE_B64 = "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";   // Invoice_Tracker.xlsx, embedded so the export matches it exactly
+const TEMPLATE_SHEET = "Tracker";
+const COLUMNS = ["SNo", "Date", "Vendor Name", "Amount", "Project", "PBB", "Product description", "Po Date", "PO"];
 
-            extractedData = [];
-            extractPaymentAdvices(text);
+if (window.pdfjsLib) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+}
 
-            if (extractedData.length > 0) {
-                showStatus(`✓ Successfully extracted ${extractedData.length} payment advice record(s)`, 'success');
-                downloadCSVBtn.disabled = false;
-                downloadExcelBtn.disabled = false;
-                displayPreview();
-            } else {
-                showStatus('⚠️ No payment advice records found. Check the text format.', 'info');
-            }
+/* Labels. Each one matches the label text inside a reconstructed line. */
+const LABELS = {
+  project:    /(?<![A-Za-z])PROJECT(?:\s*Name)?(?=\s*[:\-–]|\t|\s*$)/i,
+  poRef:      /(?<![A-Za-z])P\s*\.?\s*O\s*\.?\s*(?:\/\s*L\s*\.?\s*O\s*\.?\s*I\s*\.?)?\s*Ref\s*\.?\s*No\s*\.?/i,
+  poDate:     /(?<![A-Za-z])P\s*\.?\s*O\s*\.?\s*(?:\/\s*L\s*\.?\s*O\s*\.?\s*I\s*\.?)?\s*DATE(?![A-Za-z])/i,
+  work:       /Name\s*of\s*(?:the\s*)?Work/i,
+  agency:     /Name\s*of\s*(?:the\s*)?Agency/i,
+  submission: /Date\s*of\s*Submission(?:\s*of\s*(?:the\s*)?Complete\s*(?:and|&)\s*Corrected\s*Bill)?/i,
+  net:        /Net\s*Payable\s*Amount/i
+};
+const TEXT_FIELDS = ["project", "poRef", "work", "agency"];
+const WRAP_FIELDS = ["work", "agency"];
+
+/* ===================== State ===================== */
+let records = [];
+let logText = "";
+
+/* ===================== PDF reading ===================== */
+async function readPdf(file) {
+  const data = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data }).promise;
+  const pages = [];
+  for (let n = 1; n <= pdf.numPages; n++) {
+    const page = await pdf.getPage(n);
+    const vp = page.getViewport({ scale: 1 });
+    const tc = await page.getTextContent();
+    const tokens = [];
+    for (const it of tc.items) {
+      if (!it.str || !it.str.trim()) continue;
+      const t = pdfjsLib.Util.transform(vp.transform, it.transform);
+      const h = Math.hypot(t[2], t[3]) || 8;
+      const x = t[4], y = t[5];
+      const w = it.width * vp.scale;
+      tokens.push(...splitItem(it.str, x, y, w, h));
+    }
+    pages.push({ num: n, tokens, lines: buildLines(tokens) });
+  }
+  return pages;
+}
+
+/* pdf.js items can hold several words; split them into word tokens with approximate positions. */
+function splitItem(str, x, y, w, h) {
+  const out = [];
+  const len = str.length || 1;
+  const re = /\S+/g;
+  let m;
+  while ((m = re.exec(str))) {
+    const x0 = x + w * (m.index / len);
+    const x1 = x + w * ((m.index + m[0].length) / len);
+    out.push({ s: m[0], x0, x1, y, h });
+  }
+  return out;
+}
+
+/* Group tokens into visual lines. Wide gaps become a tab so values stop at column breaks. */
+function buildLines(tokens) {
+  const sorted = [...tokens].sort((a, b) => a.y - b.y || a.x0 - b.x0);
+  const lines = [];
+  for (const t of sorted) {
+    let line = lines.find(l => Math.abs(l.y - t.y) <= Math.max(2, 0.45 * Math.min(l.h, t.h)));
+    if (!line) { line = { y: t.y, h: t.h, toks: [] }; lines.push(line); }
+    line.toks.push(t);
+  }
+  lines.sort((a, b) => a.y - b.y);
+  for (const l of lines) {
+    l.toks.sort((a, b) => a.x0 - b.x0);
+    let text = "";
+    l.toks.forEach((t, i) => {
+      if (i > 0) {
+        const gap = t.x0 - l.toks[i - 1].x1;
+        text += gap > 2.2 * l.h ? "\t" : (gap > 0.12 * l.h ? " " : "");
+      }
+      t.at = text.length;
+      text += t.s;
+    });
+    l.text = text;
+  }
+  return lines;
+}
+
+/* x position of the character at offset `pos` in a line */
+function xAt(line, pos) {
+  let best = line.toks[0];
+  for (const t of line.toks) { if (t.at <= pos) best = t; else break; }
+  if (!best) return 0;
+  const frac = Math.min(1, Math.max(0, (pos - best.at) / (best.s.length || 1)));
+  return best.x0 + (best.x1 - best.x0) * frac;
+}
+
+/* ===================== Field rules ===================== */
+function findLabels(line) {
+  const hits = [];
+  for (const [key, re] of Object.entries(LABELS)) {
+    const g = new RegExp(re.source, re.flags.includes("g") ? re.flags : re.flags + "g");
+    let m;
+    while ((m = g.exec(line.text))) { hits.push({ key, start: m.index, end: m.index + m[0].length }); if (!m[0].length) g.lastIndex++; }
+  }
+  // drop hits contained in a longer hit (e.g. PO DATE inside a longer label)
+  hits.sort((a, b) => a.start - b.start || b.end - a.end);
+  return hits.filter((h, i) => !hits.some((o, j) => j !== i && o.start <= h.start && o.end >= h.end && (o.end - o.start) > (h.end - h.start)));
+}
+
+const LEAD = /^[\s\t:：.\-–—…_|]+/;
+function cleanValue(v) {
+  return v.replace(LEAD, "").split("\t")[0].replace(/[\s:\-–]+$/, "").replace(/\s+/g, " ").trim();
+}
+
+function extractPage(page) {
+  const out = { fields: {}, notes: [], hasAnyLabel: false };
+  const lines = page.lines;
+  const labelHits = lines.map(findLabels);
+
+  lines.forEach((line, li) => {
+    const hits = labelHits[li];
+    hits.forEach((h, hi) => {
+      out.hasAnyLabel = true;
+      if (h.key === "net") return;               // handled separately
+      if (out.fields[h.key] !== undefined && out.fields[h.key] !== "") return; // first good hit wins
+      const nextStart = hi + 1 < hits.length ? hits[hi + 1].start : line.text.length;
+      const raw = line.text.slice(h.end, nextStart);
+      let value = cleanValue(raw);
+      let valueX = null, valueLine = li;
+      if (value) {
+        const off = h.end + raw.indexOf(value.split(" ")[0]);
+        valueX = xAt(line, off);
+      } else {
+        // value on the line below, in the segment closest to the label's x
+        const below = lines[li + 1];
+        if (below && !labelHits[li + 1].length && below.y - line.y < 2.6 * line.h) {
+          const lx = xAt(line, h.start);
+          const segs = segments(below);
+          segs.sort((a, b) => Math.abs(a.x - lx) - Math.abs(b.x - lx));
+          if (segs[0]) { value = cleanValue(segs[0].text); valueX = segs[0].x; valueLine = li + 1; }
         }
-
-        function extractPaymentAdvices(fullText) {
-            // Normalize: collapse runs of spaces (PDF copy-paste often has huge gaps
-            // from table columns) but keep newlines intact
-            const normalized = fullText.replace(/[ \t]+/g, ' ');
-
-            // Each invoice's fields (PO DATE, calc table, Name of Work, Name of
-            // Agency, Date of Submission, PAYMENT ADVICE, PROJECT, PO ref) all sit
-            // together between one "PO DATE" marker and the next one. That is the
-            // only field guaranteed to start every record, so split on it.
-            const records = normalized.split(/(?=PO DATE)/i).filter(r => r.trim().length > 0);
-
-            console.log(`Found ${records.length} potential record block(s)`);
-
-            records.forEach((block, i) => {
-                try {
-                    const vendorName = extractValue(block, /Name of Agency\s*:\s*([^\n]+)/i);
-                    const date = extractValue(block, /Date of Submission[^\n]*?:\s*([^\n]+)/i);
-                    // "Net Payable Amount ………… L+M=N  297,898  297,898" -- no colon,
-                    // just dots/spaces before L+M=N, then the first amount number.
-                    const amount = extractValue(block, /Net Payable Amount[\s\S]*?L\+M=N\s+([\d,]+)/i);
-                    const project = extractValue(block, /PROJECT\s*:\s*([^\n]+)/i);
-                    const poRef = extractValue(block, /P\.?\s*O[^\n]*?ref no[.:]*\s*([^\n]*)/i);
-                    const productDesc = extractValue(block, /Name of Wor[kK]\s*:?\s*([^\n]+)/i);
-                    const poDate = extractValue(block, /PO DATE\s*([0-9]{1,2}-[A-Za-z]{3}-[0-9]{2,4})?/i);
-
-                    let pbb = '';
-                    const pbbMatch = project.match(/(\d+)\s*PBB/i);
-                    if (pbbMatch) {
-                        pbb = pbbMatch[1];
-                    }
-
-                    // A valid invoice record needs at least a vendor name and an amount
-                    if (vendorName.trim() && amount.trim()) {
-                        const data = {
-                            sno: extractedData.length + 1,
-                            date: date.trim(),
-                            vendorName: vendorName.trim(),
-                            amount: amount.trim(),
-                            project: project.trim(),
-                            pbb: pbb.trim(),
-                            productDescription: productDesc.trim(),
-                            poDate: (poDate || '').trim(),
-                            po: poRef.trim()
-                        };
-
-                        extractedData.push(data);
-                        console.log(`Record ${data.sno} extracted:`, data);
-                    } else {
-                        console.log(`Block ${i} skipped (missing vendor name or amount)`, { vendorName, amount });
-                    }
-                } catch (e) {
-                    console.error(`Error extracting block ${i}:`, e);
-                }
-            });
-
-            console.log(`Total records successfully extracted: ${extractedData.length}`);
+      }
+      // wrapped continuation for long text fields
+      if (value && WRAP_FIELDS.includes(h.key) && valueX !== null) {
+        let k = valueLine + 1, prevY = lines[valueLine].y;
+        while (k < lines.length && k <= valueLine + 2) {
+          const nl = lines[k];
+          if (labelHits[k].length || nl.y - prevY > 1.9 * line.h) break;
+          const seg = segments(nl).find(s => Math.abs(s.x - valueX) < Math.max(6, line.h * 0.8));
+          if (!seg || /^[\d,.\s]+$/.test(seg.text)) break;
+          value += " " + seg.text.trim();
+          prevY = nl.y; k++;
         }
+      }
+      out.fields[h.key] = value;
+    });
+  });
 
-        function extractValue(text, pattern) {
-            try {
-                const match = text.match(pattern);
-                return match ? match[1] : '';
-            } catch (e) {
-                return '';
-            }
-        }
+  // Dates: first parseable date in the field value, else in the label line / next two label-free lines
+  for (const key of ["poDate", "submission"]) {
+    let d = parseDate(out.fields[key] || "");
+    const li = labelHits.findIndex(hs => hs.some(h => h.key === key));
+    for (let k = li; li >= 0 && !d && k <= li + 2 && k < lines.length; k++) {
+      const hits = labelHits[k];
+      if (k === li) {
+        const h = hits.find(x => x.key === key);
+        const next = hits.find(x => x.start >= h.end);
+        d = parseDate(lines[k].text.slice(h.end, next ? next.start : undefined));
+      } else if (!hits.length) {
+        d = parseDate(lines[k].text);
+      }
+    }
+    out.fields[key + "Parsed"] = d;
+  }
 
-        function displayPreview() {
-            const tbody = document.getElementById('previewBody');
-            tbody.innerHTML = '';
+  // Net payable amount in the Gross Value column
+  const net = netPayable(page, labelHits);
+  out.fields.amount = net.value;
+  out.fields.amountRaw = net.raw;
+  if (net.note) out.notes.push(net.note);
+  return out;
+}
 
-            if (extractedData.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="10" class="empty-message">No data to display</td></tr>';
-                return;
-            }
+function segments(line) {
+  const segs = [];
+  let cur = null;
+  line.toks.forEach((t, i) => {
+    const gapBig = i > 0 && line.text[t.at - 1] === "\t";
+    if (!cur || gapBig) { cur = { x: t.x0, x1: t.x1, text: t.s }; segs.push(cur); }
+    else { cur.text += (line.text[t.at - 1] === " " ? " " : "") + t.s; cur.x1 = t.x1; }
+  });
+  return segs;
+}
 
-            extractedData.forEach((row, idx) => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td class="row-number">${idx + 1}</td>
-                    <td>${row.sno}</td>
-                    <td>${row.date}</td>
-                    <td>${row.vendorName}</td>
-                    <td>${row.amount}</td>
-                    <td>${row.project}</td>
-                    <td>${row.pbb}</td>
-                    <td>${row.productDescription}</td>
-                    <td>${row.poDate}</td>
-                    <td>${row.po}</td>
-                `;
-                tbody.appendChild(tr);
-            });
+const NUM_RE = /^\(?-?(?:\d{1,3}(?:,\d{2,3})+|\d+)(?:\.\d+)?\)?$/;
+function toNumber(s) {
+  const neg = /^\(.*\)$/.test(s) || s.startsWith("-");
+  const n = parseFloat(s.replace(/[(),\-]/g, ""));
+  return isNaN(n) ? null : (neg ? -n : n);
+}
 
-            document.getElementById('recordCount').textContent = extractedData.length;
-            
-            const total = extractedData.reduce((sum, r) => {
-                const num = parseInt(r.amount.replace(/\D/g, '')) || 0;
-                return sum + num;
-            }, 0);
-            document.getElementById('totalAmount').textContent = '₹' + total.toLocaleString('en-IN');
-            
-            const uniqueVendors = new Set(extractedData.map(r => r.vendorName)).size;
-            document.getElementById('uniqueVendors').textContent = uniqueVendors;
+function netPayable(page, labelHits) {
+  const li = labelHits.findIndex(hs => hs.some(h => h.key === "net"));
+  if (li < 0) return { value: null, raw: "", note: "" };
+  const line = page.lines[li];
+  const hit = labelHits[li].find(h => h.key === "net");
+  const labelX = xAt(line, hit.start);
 
-            // Display CSV
-            const csv = generateCSV();
-            document.getElementById('csvOutput').textContent = csv;
+  // numbers on the Net Payable row (widen tolerance if the row is taller than one line)
+  const rowNums = tol => page.tokens.filter(t =>
+    Math.abs(t.y - line.y) <= tol && t.x0 > labelX && NUM_RE.test(t.s) && /\d/.test(t.s));
+  let nums = rowNums(Math.max(2, 0.45 * line.h));
+  if (!nums.length) nums = rowNums(1.3 * line.h);
+  nums.sort((a, b) => a.x0 - b.x0);
+  if (!nums.length) return { value: null, raw: "", note: "Net Payable row has no number" };
 
-            previewSection.classList.add('show');
-        }
+  // 1) Gross Value column heading above the row
+  const heads = [];
+  page.lines.forEach(l => {
+    if (l.y >= line.y) return;
+    l.toks.forEach((t, i) => {
+      if (!/^gross/i.test(t.s)) return;
+      let x0 = t.x0, x1 = t.x1, hasValue = /value/i.test(t.s);
+      const nxt = l.toks[i + 1];
+      if (nxt && /^value/i.test(nxt.s) && nxt.x0 - t.x1 < 1.5 * l.h) { x1 = Math.max(x1, nxt.x1); hasValue = true; }
+      if (!hasValue) {   // "Gross" above "Value" in a two-line header
+        const under = page.tokens.find(u => /^value/i.test(u.s) && u.y > t.y && u.y - t.y < 1.8 * l.h && u.x1 > t.x0 - 4 && u.x0 < t.x1 + 4);
+        if (under) { x0 = Math.min(x0, under.x0); x1 = Math.max(x1, under.x1); hasValue = true; }
+      }
+      heads.push({ x0, x1, y: l.y, hasValue });
+    });
+  });
+  heads.sort((a, b) => (b.hasValue - a.hasValue) || (b.y - a.y));   // prefer "Gross Value", nearest above
+  const head = heads[0];
+  if (head) {
+    const cx = (head.x0 + head.x1) / 2;
+    const dist = n => Math.max(0, head.x0 - n.x1, n.x0 - head.x1) + 0.01 * Math.abs((n.x0 + n.x1) / 2 - cx);
+    const pick = [...nums].sort((a, b) => dist(a) - dist(b))[0];
+    const far = dist(pick) > 4 * line.h;
+    return { value: toNumber(pick.s), raw: pick.s, note: far ? "Amount not directly under Gross Value, please check" : "" };
+  }
 
-        function generateCSV() {
-            let csv = 'SNo,Date,Vendor Name,Amount,Project,PBB,Product description,Po Date,PO\n';
-            
-            extractedData.forEach(row => {
-                const fields = [
-                    row.sno,
-                    '"' + row.date.replace(/"/g, '""') + '"',
-                    '"' + row.vendorName.replace(/"/g, '""') + '"',
-                    '"' + row.amount.replace(/"/g, '""') + '"',
-                    '"' + row.project.replace(/"/g, '""') + '"',
-                    row.pbb,
-                    '"' + row.productDescription.replace(/"/g, '""') + '"',
-                    row.poDate,
-                    '"' + row.po.replace(/"/g, '""') + '"'
-                ];
-                csv += fields.join(',') + '\n';
-            });
-            
-            return csv;
-        }
+  // 2) no heading found: Gross Value = basic + tax, so it is the largest number on the row
+  const big = [...nums].sort((a, b) => Math.abs(toNumber(b.s)) - Math.abs(toNumber(a.s)))[0];
+  return { value: toNumber(big.s), raw: big.s, note: "No Gross Value heading found; used largest number on the Net Payable row" };
+}
 
-        function downloadCSV() {
-            const csv = generateCSV();
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            const url = URL.createObjectURL(blob);
-            
-            link.setAttribute('href', url);
-            link.setAttribute('download', 'Payment_Advice_' + new Date().toISOString().slice(0, 10) + '.csv');
-            link.style.visibility = 'hidden';
-            
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            
-            showStatus(`✓ CSV downloaded: ${extractedData.length} records`, 'success');
-        }
+/* ===================== Dates ===================== */
+const MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12 };
+function fixYear(y) { y = +y; return y < 100 ? (y < 50 ? 2000 + y : 1900 + y) : y; }
+function validDate(y, m, d) {
+  if (!(m >= 1 && m <= 12 && d >= 1 && d <= 31)) return null;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCDate() === d ? { y, m, d } : null;
+}
+function parseDate(s) {
+  if (!s) return null;
+  s = s.replace(/\t/g, " ");
+  let m;
+  const mon = "(jan|feb|mar|apr|may|jun|jul|aug|sept?|oct|nov|dec)[a-z]*";
+  if ((m = s.match(new RegExp("\\b(\\d{1,2})(?:st|nd|rd|th)?[\\s\\-/.,]*" + mon + "[\\s\\-/.,']*(\\d{2,4})\\b", "i"))))
+    return validDate(fixYear(m[3]), MONTHS[m[2].toLowerCase()], +m[1]);
+  if ((m = s.match(new RegExp("\\b" + mon + "[\\s\\-/.]*(\\d{1,2})(?:st|nd|rd|th)?,?[\\s\\-/.]*(\\d{4})\\b", "i"))))
+    return validDate(+m[3], MONTHS[m[1].toLowerCase()], +m[2]);
+  if ((m = s.match(/\b(\d{4})[\-/.](\d{1,2})[\-/.](\d{1,2})\b/)))
+    return validDate(+m[1], +m[2], +m[3]);
+  if ((m = s.match(/\b(\d{1,2})[\-/.](\d{1,2})[\-/.](\d{2,4})\b/)))
+    return validDate(fixYear(m[3]), +m[2], +m[1]);   // Indian order: day first
+  return null;
+}
+const MON3 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function fmtLong(d) {
+  return new Date(Date.UTC(d.y, d.m - 1, d.d)).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });
+}
+function fmtShort(d) { return d.d + "-" + MON3[d.m - 1] + "-" + String(d.y).slice(-2); }
 
-        function xmlEscape(value) {
-            return String(value)
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&apos;');
-        }
+/* ===================== Records ===================== */
+function toRecord(ex, file, pageNum) {
+  const f = ex.fields;
+  return {
+    date: f.submissionParsed ? fmtLong(f.submissionParsed) : (f.submission || ""),
+    dateParsed: !!f.submissionParsed,
+    vendor: f.agency || "",
+    amount: f.amount,
+    project: f.project || "",
+    pbb: "",
+    work: f.work || "",
+    poDate: f.poDateParsed || null,
+    poDateText: f.poDateParsed ? fmtShort(f.poDateParsed) : (f.poDate || ""),
+    po: f.poRef || "",
+    source: file + " p." + pageNum,
+    notes: [...ex.notes]
+  };
+}
 
-        function cellXML(value, forceText) {
-            const str = (value === null || value === undefined) ? '' : String(value);
-            // Treat SNo and PBB as numbers when purely numeric; everything else
-            // (including Amount, which has commas) stays text so Excel doesn't
-            // try to re-parse/mangle it.
-            const isNumeric = !forceText && /^-?\d+(\.\d+)?$/.test(str.trim());
-            const type = isNumeric ? 'Number' : 'String';
-            return `<Cell><Data ss:Type="${type}">${xmlEscape(str)}</Data></Cell>`;
-        }
+function mergeInto(rec, ex, pageNum) {
+  const add = toRecord(ex, "", pageNum);
+  for (const k of ["date", "vendor", "project", "work", "po", "poDateText"]) if (!rec[k] && add[k]) rec[k] = add[k];
+  if (!rec.dateParsed && add.dateParsed) rec.dateParsed = true;
+  if (!rec.poDate && add.poDate) rec.poDate = add.poDate;
+  if ((rec.amount === null || rec.amount === undefined) && add.amount !== null && add.amount !== undefined) rec.amount = add.amount;
+  rec.notes.push(...add.notes);
+  rec.source += "+" + pageNum;
+}
 
-        function generateExcelXML() {
-            const headers = ['SNo', 'Date', 'Vendor Name', 'Amount', 'Project', 'PBB', 'Product description', 'Po Date', 'PO'];
+async function handleFiles(fileList) {
+  const files = [...fileList].filter(f => /\.pdf$/i.test(f.name) || f.type === "application/pdf");
+  if (!files.length) { setStatus("Please drop PDF files.", true); return; }
+  if (!window.pdfjsLib || !window.ExcelJS) { setStatus("Could not load the PDF/Excel libraries. Check the internet connection and reload.", true); return; }
+  for (const file of files) {
+    setStatus("Reading " + file.name + " …");
+    let pages;
+    try { pages = await readPdf(file); }
+    catch (e) { console.error(e); setStatus("Could not read " + file.name + ": " + e.message, true); continue; }
+    logText += "==== " + file.name + " (" + pages.length + " pages) ====\n";
+    let last = null;
+    for (const p of pages) {
+      logText += "--- page " + p.num + " ---\n" + p.lines.map(l => l.text.replace(/\t/g, "  ⇥  ")).join("\n") + "\n";
+      if (!p.tokens.length) {
+        logText += "[no text layer: scanned image, needs OCR]\n";
+        records.push(Object.assign(blankRecord(file.name, p.num), { notes: ["Scanned page with no text layer; enter values manually"] }));
+        last = null;
+        continue;
+      }
+      const ex = extractPage(p);
+      const f = ex.fields;
+      const isNew = f.agency || f.project || f.poRef;
+      if (!isNew && last && (f.amount != null || f.work || f.submission || f.poDate)) { mergeInto(last, ex, p.num); continue; }
+      if (!isNew && f.amount == null) { logText += "[skipped: no payment advice fields on this page]\n"; continue; }
+      last = toRecord(ex, file.name, p.num);
+      records.push(last);
+    }
+  }
+  render();
+  setStatus("Done. " + records.length + " advice(s) from " + files.length + " file(s). Review the table, then download.");
+}
 
-            let rowsXML = '';
-            rowsXML += '<Row ss:StyleID="Header">' + headers.map(h => cellXML(h, true)).join('') + '</Row>\n';
+function blankRecord(file, page) {
+  return { date: "", dateParsed: false, vendor: "", amount: null, project: "", pbb: "", work: "", poDate: null, poDateText: "", po: "", source: file + " p." + page, notes: [] };
+}
 
-            extractedData.forEach(row => {
-                rowsXML += '<Row>' +
-                    cellXML(row.sno) +
-                    cellXML(row.date, true) +
-                    cellXML(row.vendorName, true) +
-                    cellXML(row.amount, true) +
-                    cellXML(row.project, true) +
-                    cellXML(row.pbb) +
-                    cellXML(row.productDescription, true) +
-                    cellXML(row.poDate, true) +
-                    cellXML(row.po, true) +
-                    '</Row>\n';
-            });
+function checks(r) {
+  const miss = [];
+  if (!r.date) miss.push("Date"); else if (!r.dateParsed) miss.push("Date format");
+  if (!r.vendor) miss.push("Vendor");
+  if (r.amount === null || r.amount === undefined) miss.push("Amount");
+  if (!r.project) miss.push("Project");
+  if (!r.work) miss.push("Description");
+  if (!r.poDateText) miss.push("Po Date"); else if (!r.poDate) miss.push("Po Date format");
+  if (!r.po) miss.push("PO");
+  return miss;
+}
 
-            return `<?xml version="1.0"?>
-<?mso-application progid="Excel.Sheet"?>
-<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
- xmlns:o="urn:schemas-microsoft-com:office:office"
- xmlns:x="urn:schemas-microsoft-com:office:excel"
- xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
- <Styles>
-  <Style ss:ID="Header">
-   <Font ss:Bold="1" ss:Color="#FFFFFF"/>
-   <Interior ss:Color="#667EEA" ss:Pattern="Solid"/>
-  </Style>
- </Styles>
- <Worksheet ss:Name="Payment Advice">
-  <Table>
-   <Column ss:Width="40"/>
-   <Column ss:Width="140"/>
-   <Column ss:Width="180"/>
-   <Column ss:Width="90"/>
-   <Column ss:Width="110"/>
-   <Column ss:Width="50"/>
-   <Column ss:Width="170"/>
-   <Column ss:Width="80"/>
-   <Column ss:Width="230"/>
-${rowsXML}  </Table>
- </Worksheet>
-</Workbook>`;
-        }
+/* ===================== Table ===================== */
+const fmtINR = n => n === null || n === undefined ? "" : n.toLocaleString("en-IN", { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 });
 
-        function downloadExcel() {
-            if (extractedData.length === 0) {
-                showStatus('❌ No data to export yet', 'error');
-                return;
-            }
+function render() {
+  const tb = document.getElementById("tbody");
+  tb.innerHTML = "";
+  document.getElementById("results").hidden = false;
+  if (!records.length) { tb.innerHTML = '<tr><td colspan="11" class="empty">No payment advices found</td></tr>'; updateStats(); return; }
+  records.forEach((r, i) => {
+    const tr = document.createElement("tr");
+    const cell = (text, opts = {}) => {
+      const td = document.createElement("td");
+      td.textContent = text;
+      if (opts.cls) td.className = opts.cls;
+      if (opts.edit) {
+        td.contentEditable = "true";
+        td.addEventListener("blur", () => { opts.edit(td.textContent.trim()); render(); });
+        td.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); td.blur(); } });
+      }
+      if (opts.missing) td.classList.add("missing");
+      tr.appendChild(td);
+      return td;
+    };
+    cell(String(i + 1));
+    cell(r.date, { missing: !r.date, edit: v => { const d = parseDate(v); r.date = d ? fmtLong(d) : v; r.dateParsed = !!d; } });
+    cell(r.vendor, { missing: !r.vendor, edit: v => r.vendor = v });
+    cell(fmtINR(r.amount), { cls: "num", missing: r.amount == null, edit: v => { const n = toNumber(v.replace(/[₹\s]/g, "")); r.amount = v ? n : null; } });
+    cell(r.project, { missing: !r.project, edit: v => r.project = v });
+    cell(r.pbb, { edit: v => r.pbb = v });
+    cell(r.work, { missing: !r.work, edit: v => r.work = v });
+    cell(r.poDateText, { missing: !r.poDateText, edit: v => { const d = parseDate(v); r.poDate = d; r.poDateText = d ? fmtShort(d) : v; } });
+    cell(r.po, { missing: !r.po, edit: v => r.po = v });
+    cell(r.source, { cls: "src" });
+    const td = cell("");
+    const miss = checks(r);
+    if (!miss.length && !r.notes.length) td.innerHTML = '<span class="tag ok">OK</span>';
+    miss.forEach(m => { const s = document.createElement("span"); s.className = "tag bad"; s.textContent = m; td.appendChild(s); });
+    r.notes.forEach(n => { const s = document.createElement("span"); s.className = "tag warn"; s.textContent = n; td.appendChild(s); });
+    tb.appendChild(tr);
+  });
+  document.getElementById("log").textContent = logText;
+  updateStats();
+}
 
-            const xml = generateExcelXML();
-            const blob = new Blob([xml], { type: 'application/vnd.ms-excel' });
-            const link = document.createElement('a');
-            const url = URL.createObjectURL(blob);
+function updateStats() {
+  const total = records.reduce((s, r) => s + (r.amount || 0), 0);
+  document.getElementById("stCount").textContent = records.length;
+  document.getElementById("stTotal").textContent = "₹" + fmtINR(Math.round(total * 100) / 100);
+  document.getElementById("stVendors").textContent = new Set(records.map(r => r.vendor).filter(Boolean)).size;
+  document.getElementById("stFlags").textContent = records.filter(r => checks(r).length || r.notes.length).length;
+  document.getElementById("xlsxBtn").disabled = !records.length;
+  document.getElementById("csvBtn").disabled = !records.length;
+}
 
-            link.setAttribute('href', url);
-            link.setAttribute('download', 'Payment_Advice_' + new Date().toISOString().slice(0, 10) + '.xls');
-            link.style.visibility = 'hidden';
+/* ===================== Export ===================== */
+function b64ToBuf(b64) {
+  const bin = atob(b64), buf = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  return buf.buffer;
+}
 
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
+async function downloadXlsx() {
+  try {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(b64ToBuf(TEMPLATE_B64));
+    const ws = wb.getWorksheet(TEMPLATE_SHEET) || wb.worksheets[0];
+    // copy the sample row's cell styles (number formats etc.), then remove sample data
+    const sample = ws.getRow(2);
+    const styles = [];
+    for (let c = 1; c <= COLUMNS.length; c++) styles[c] = JSON.parse(JSON.stringify(sample.getCell(c).style || {}));
+    if (ws.rowCount > 1) ws.spliceRows(2, ws.rowCount - 1);
 
-            showStatus(`✓ Excel file downloaded: ${extractedData.length} records`, 'success');
-        }
+    records.forEach((r, i) => {
+      const row = ws.getRow(i + 2);
+      const values = [
+        i + 1,
+        r.date || null,
+        r.vendor || null,
+        r.amount == null ? null : r.amount,
+        r.project || null,
+        r.pbb || null,
+        r.work || null,
+        r.poDate ? new Date(Date.UTC(r.poDate.y, r.poDate.m - 1, r.poDate.d)) : (r.poDateText || null),
+        r.po || null
+      ];
+      values.forEach((v, k) => { const cell = row.getCell(k + 1); cell.value = v; cell.style = JSON.parse(JSON.stringify(styles[k + 1])); });
+      row.commit();
+    });
 
-        function showStatus(msg, type) {
-            status.textContent = msg;
-            status.className = `status show ${type}`;
-        }
+    const out = await wb.xlsx.writeBuffer();
+    save(new Blob([out], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), "Invoice_Tracker_" + today() + ".xlsx");
+    setStatus("Excel downloaded: " + records.length + " row(s).");
+  } catch (e) { console.error(e); setStatus("Excel export failed: " + e.message, true); }
+}
 
-        function resetForm() {
-            textInput.value = '';
-            extractedData = [];
-            downloadCSVBtn.disabled = true;
-            downloadExcelBtn.disabled = true;
-            status.classList.remove('show');
-            previewSection.classList.remove('show');
-            document.getElementById('previewBody').innerHTML = '<tr><td colspan="10" class="empty-message">No data extracted yet</td></tr>';
-        }
-    </script>
+function downloadCsv() {
+  const q = v => { const s = v == null ? "" : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const rows = [COLUMNS.join(",")].concat(records.map((r, i) =>
+    [i + 1, r.date, r.vendor, r.amount == null ? "" : r.amount, r.project, r.pbb, r.work, r.poDateText, r.po].map(q).join(",")));
+  save(new Blob(["﻿" + rows.join("\r\n")], { type: "text/csv;charset=utf-8" }), "Invoice_Tracker_" + today() + ".csv");
+}
+
+function save(blob, name) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+function today() { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+function setStatus(msg, err) { const s = document.getElementById("status"); s.textContent = msg; s.className = "status" + (err ? " err" : ""); }
+
+/* ===================== Wiring ===================== */
+const drop = document.getElementById("drop");
+const fileInput = document.getElementById("fileInput");
+fileInput.addEventListener("change", e => { handleFiles(e.target.files); fileInput.value = ""; });
+["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => handleFiles(e.dataTransfer.files));
+window.addEventListener("dragover", e => e.preventDefault());
+window.addEventListener("drop", e => e.preventDefault());
+document.getElementById("xlsxBtn").addEventListener("click", downloadXlsx);
+document.getElementById("csvBtn").addEventListener("click", downloadCsv);
+document.getElementById("clearBtn").addEventListener("click", () => {
+  records = []; logText = ""; document.getElementById("results").hidden = true;
+  document.getElementById("tbody").innerHTML = '<tr><td colspan="11" class="empty">No data yet</td></tr>';
+  updateStats(); setStatus("No files loaded.");
+});
+</script>
 </body>
 </html>
